@@ -1,0 +1,32 @@
+# --- Root/General ---
+.DS_Store
+.env
+.env*.local
+*.log
+
+# --- Server (Golang) ---
+# Executables
+server/server
+server/*.exe
+server/*.exe~
+server/*.dll
+server/*.so
+server/*.dylib
+# Test binary
+server/*.test
+# Dependency tool
+server/vendor/
+# Output folder (jika ada)
+server/bin/
+
+# --- Client (Next.js / Node) ---
+client/node_modules/
+client/.next/
+client/out/
+client/build/
+client/.vercel/
+client/*.tsbuildinfo
+
+# --- IDE/Tools ---
+.vscode/
+.idea/
