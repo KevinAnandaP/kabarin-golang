@@ -18,6 +18,9 @@ server/*.test
 server/vendor/
 # Output folder (jika ada)
 server/bin/
+# Md
+server/DATABASE_SETUP.Md
+server/STRUCTURE.Md
 
 # --- Client (Next.js / Node) ---
 client/node_modules/
