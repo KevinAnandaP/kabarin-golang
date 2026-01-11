@@ -3,6 +3,7 @@
 .env
 .env*.local
 *.log
+Ngabarin.postman_collection.json
 
 # --- Server (Golang) ---
 # Executables

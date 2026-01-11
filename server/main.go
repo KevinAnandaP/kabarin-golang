@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"ngabarin/server/internal/database"
+	"ngabarin/server/internal/routes"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -36,13 +37,8 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"message": "Ngabarin API is running",
-		})
-	})
+	// Setup routes
+	routes.SetupRoutes(app)
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

@@ -1,15 +1,15 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
+-- 1. Users table
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    unique_id VARCHAR(50) UNIQUE NOT NULL, -- Format: #GOPRO-882
+    unique_id VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
-    password_hash TEXT, -- NULL untuk Google OAuth users
+    password_hash TEXT,
     avatar TEXT,
-    auth_provider VARCHAR(20) NOT NULL DEFAULT 'email', -- 'email' or 'google'
+    auth_provider VARCHAR(20) NOT NULL DEFAULT 'email',
     google_id VARCHAR(255) UNIQUE,
     is_online BOOLEAN DEFAULT FALSE,
     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -17,34 +17,7 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Contacts table (Friend list)
-CREATE TABLE contacts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    contact_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, contact_id),
-    CHECK (user_id != contact_id) -- Prevent self-friending
-);
-
--- Messages table
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    receiver_id UUID REFERENCES users(id) ON DELETE CASCADE, -- NULL for group messages
-    group_id UUID REFERENCES groups(id) ON DELETE CASCADE, -- NULL for direct messages
-    content TEXT NOT NULL,
-    type VARCHAR(20) DEFAULT 'text', -- 'text', 'image', 'file'
-    status VARCHAR(20) DEFAULT 'sent', -- 'sent', 'delivered', 'read'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CHECK (
-        (receiver_id IS NOT NULL AND group_id IS NULL) OR 
-        (receiver_id IS NULL AND group_id IS NOT NULL)
-    ) -- Message must be either direct or group, not both
-);
-
--- Groups table
+-- 2. Groups table (Dipindah ke sini agar messages bisa merujuk ke sini)
 CREATE TABLE groups (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -54,7 +27,34 @@ CREATE TABLE groups (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Group members table
+-- 3. Contacts table
+CREATE TABLE contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, contact_id),
+    CHECK (user_id != contact_id)
+);
+
+-- 4. Messages table (Sekarang 'groups' sudah ada, jadi tidak error lagi)
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id UUID REFERENCES users(id) ON DELETE CASCADE, 
+    group_id UUID REFERENCES groups(id) ON DELETE CASCADE, 
+    content TEXT NOT NULL,
+    type VARCHAR(20) DEFAULT 'text',
+    status VARCHAR(20) DEFAULT 'sent',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CHECK (
+        (receiver_id IS NOT NULL AND group_id IS NULL) OR 
+        (receiver_id IS NULL AND group_id IS NOT NULL)
+    )
+);
+
+-- 5. Group members table
 CREATE TABLE group_members (
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

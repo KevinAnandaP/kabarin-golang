@@ -1,46 +1,41 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
 	"os"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var DB *sql.DB
+var Pool *pgxpool.Pool
 
-// Connect initializes the database connection
 func Connect() error {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
 		return fmt.Errorf("DATABASE_URL environment variable is not set")
 	}
 
+	// Buat konfigurasi pool
 	var err error
-	DB, err = sql.Open("postgres", databaseURL)
+	Pool, err = pgxpool.New(context.Background(), databaseURL)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
+		return fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Test the connection
-	if err := DB.Ping(); err != nil {
+	// Test koneksi
+	err = Pool.Ping(context.Background())
+	if err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Set connection pool settings
-	DB.SetMaxOpenConns(25)
-	DB.SetMaxIdleConns(5)
-
-	log.Println("✅ Database connected successfully")
+	log.Println("✅ Database connected successfully using PGX")
 	return nil
 }
 
-// Close closes the database connection
-func Close() error {
-	if DB != nil {
-		return DB.Close()
+func Close() {
+	if Pool != nil {
+		Pool.Close()
 	}
-	return nil
 }
