@@ -14,17 +14,38 @@ type Claims struct {
 	UserID   string `json:"userId"`
 	Email    string `json:"email"`
 	UniqueID string `json:"uniqueId"`
+	Type     string `json:"type"` // "access" or "refresh"
 	jwt.RegisteredClaims
 }
 
-// GenerateToken generates a JWT token for a user
+// GenerateToken generates a JWT access token for a user
 func GenerateToken(userID, email, uniqueID string) (string, error) {
-	expirationTime := time.Now().Add(24 * time.Hour) // 24 hours
+	expirationTime := time.Now().Add(15 * time.Minute) // 15 minutes for access token
 
 	claims := &Claims{
 		UserID:   userID,
 		Email:    email,
 		UniqueID: uniqueID,
+		Type:     "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
+// GenerateRefreshToken generates a JWT refresh token for a user
+func GenerateRefreshToken(userID, email, uniqueID string) (string, error) {
+	expirationTime := time.Now().Add(7 * 24 * time.Hour) // 7 days for refresh token
+
+	claims := &Claims{
+		UserID:   userID,
+		Email:    email,
+		UniqueID: uniqueID,
+		Type:     "refresh",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

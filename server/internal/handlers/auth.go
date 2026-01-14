@@ -105,7 +105,7 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate JWT token
+	// Generate JWT access token
 	token, err := utils.GenerateToken(user.ID, user.Email, user.UniqueID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -114,14 +114,33 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	// Set HTTP-Only Cookie
+	// Generate refresh token
+	refreshToken, err := utils.GenerateRefreshToken(user.ID, user.Email, user.UniqueID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to generate refresh token",
+		})
+	}
+
+	// Set HTTP-Only Cookie for access token
 	c.Cookie(&fiber.Cookie{
 		Name:     "token",
 		Value:    token,
 		HTTPOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: "Lax",
-		MaxAge:   86400, // 24 hours
+		MaxAge:   900, // 15 minutes
+	})
+
+	// Set HTTP-Only Cookie for refresh token
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+		MaxAge:   604800, // 7 days
 	})
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -194,7 +213,7 @@ func Login(c *fiber.Ctx) error {
 
 	user.IsOnline = true
 
-	// Generate JWT token
+	// Generate JWT access token
 	token, err := utils.GenerateToken(user.ID, user.Email, user.UniqueID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -203,14 +222,33 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// Set HTTP-Only Cookie
+	// Generate refresh token
+	refreshToken, err := utils.GenerateRefreshToken(user.ID, user.Email, user.UniqueID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to generate refresh token",
+		})
+	}
+
+	// Set HTTP-Only Cookie for access token
 	c.Cookie(&fiber.Cookie{
 		Name:     "token",
 		Value:    token,
 		HTTPOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: "Lax",
-		MaxAge:   86400, // 24 hours
+		MaxAge:   900, // 15 minutes
+	})
+
+	// Set HTTP-Only Cookie for refresh token
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+		MaxAge:   604800, // 7 days
 	})
 
 	return c.JSON(fiber.Map{
@@ -262,9 +300,19 @@ func Logout(c *fiber.Ctx) error {
 		// Log error but don't fail the logout
 	}
 
-	// Clear cookie
+	// Clear access token cookie
 	c.Cookie(&fiber.Cookie{
 		Name:     "token",
+		Value:    "",
+		HTTPOnly: true,
+		Secure:   false,
+		SameSite: "Lax",
+		MaxAge:   -1, // Delete cookie
+	})
+
+	// Clear refresh token cookie
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
 		Value:    "",
 		HTTPOnly: true,
 		Secure:   false,
@@ -275,5 +323,77 @@ func Logout(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Logged out successfully",
+	})
+}
+
+// RefreshToken handles token refresh
+func RefreshToken(c *fiber.Ctx) error {
+	// Get refresh token from cookies
+	refreshToken := c.Cookies("refresh_token")
+	if refreshToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"error":   "Refresh token not found",
+		})
+	}
+
+	// Validate refresh token
+	claims, err := utils.ValidateToken(refreshToken)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"error":   "Invalid refresh token",
+		})
+	}
+
+	// Check if token type is refresh
+	if claims.Type != "refresh" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"success": false,
+			"error":   "Invalid token type",
+		})
+	}
+
+	// Generate new access token
+	newAccessToken, err := utils.GenerateToken(claims.UserID, claims.Email, claims.UniqueID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to generate access token",
+		})
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := utils.GenerateRefreshToken(claims.UserID, claims.Email, claims.UniqueID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to generate refresh token",
+		})
+	}
+
+	// Set HTTP-Only Cookie for new access token
+	c.Cookie(&fiber.Cookie{
+		Name:     "token",
+		Value:    newAccessToken,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+		MaxAge:   900, // 15 minutes
+	})
+
+	// Set HTTP-Only Cookie for new refresh token
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    newRefreshToken,
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: "Lax",
+		MaxAge:   604800, // 7 days
+	})
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Tokens refreshed successfully",
 	})
 }

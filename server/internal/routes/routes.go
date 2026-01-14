@@ -28,11 +28,13 @@ func SetupRoutes(app *fiber.App) {
 
 	// Auth routes (public)
 	auth := api.Group("/auth")
-	auth.Post("/register", handlers.Register)
-	auth.Post("/login", handlers.Login)
+	auth.Post("/register", middleware.StrictRateLimiter(), handlers.Register)
+	auth.Post("/login", middleware.StrictRateLimiter(), handlers.Login)
+	auth.Post("/refresh", middleware.StrictRateLimiter(), handlers.RefreshToken)
 	auth.Post("/logout", middleware.AuthMiddleware, handlers.Logout)
 	auth.Get("/me", middleware.AuthMiddleware, handlers.GetMe)
-
+	auth.Get("/google", handlers.GoogleOAuthURL)
+	auth.Get("/google/callback", handlers.GoogleOAuthCallback)
 	// Contact routes (protected)
 	contacts := api.Group("/contacts", middleware.AuthMiddleware)
 	contacts.Post("/", handlers.AddContact)
@@ -48,6 +50,14 @@ func SetupRoutes(app *fiber.App) {
 	messages.Patch("/:messageId/status", handlers.UpdateMessageStatus)
 	messages.Post("/group", handlers.SendGroupMessage)
 	messages.Get("/group/:groupId", handlers.GetGroupMessages)
+
+	// Upload routes (protected)
+	uploads := api.Group("/upload", middleware.AuthMiddleware)
+	uploads.Post("/file", middleware.UploadRateLimiter(), handlers.UploadFile)
+	uploads.Post("/avatar", middleware.UploadRateLimiter(), handlers.UploadAvatar)
+
+	// Serve uploaded files (public)
+	app.Get("/uploads/:type/:filename", handlers.GetFile)
 
 	// Group routes (protected)
 	groups := api.Group("/groups", middleware.AuthMiddleware)
