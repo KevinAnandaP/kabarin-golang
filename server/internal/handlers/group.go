@@ -7,6 +7,7 @@ import (
 
 	"ngabarin/server/internal/database"
 	"ngabarin/server/internal/models"
+	ws "ngabarin/server/internal/websocket"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -725,6 +726,39 @@ func SendGroupMessage(c *fiber.Ctx) error {
 			"success": false,
 			"error":   "Failed to send message",
 		})
+	}
+
+	// Broadcast message via WebSocket to all group members
+	if WSHub != nil {
+		wsMessage := ws.WSMessage{
+			Type: ws.EventGroupMessageReceived,
+			Payload: ws.GroupMessagePayload{
+				ID:        message.ID,
+				GroupID:   req.GroupID,
+				SenderID:  message.SenderID,
+				Content:   message.Content,
+				Type:      message.Type,
+				CreatedAt: message.CreatedAt,
+			},
+			Timestamp: time.Now(),
+		}
+		// Broadcast to all group members except sender
+		WSHub.BroadcastToGroup(req.GroupID, wsMessage, userID)
+
+		// Also send to sender for confirmation
+		confirmMessage := ws.WSMessage{
+			Type: ws.EventGroupMessageSent,
+			Payload: ws.GroupMessagePayload{
+				ID:        message.ID,
+				GroupID:   req.GroupID,
+				SenderID:  message.SenderID,
+				Content:   message.Content,
+				Type:      message.Type,
+				CreatedAt: message.CreatedAt,
+			},
+			Timestamp: time.Now(),
+		}
+		WSHub.BroadcastToUser(userID, confirmMessage)
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{

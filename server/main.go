@@ -25,6 +25,9 @@ func main() {
 	}
 	defer database.Close()
 
+	// Initialize WebSocket hub
+	routes.InitWebSocket()
+
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
 		AppName: "Ngabarin API v1.0",

@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"time"
 
 	"ngabarin/server/internal/database"
 	"ngabarin/server/internal/models"
+	ws "ngabarin/server/internal/websocket"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
@@ -91,6 +93,54 @@ func SendMessage(c *fiber.Ctx) error {
 			"success": false,
 			"error":   "Failed to send message",
 		})
+	}
+
+	// Broadcast message via WebSocket to receiver if online
+	if WSHub != nil {
+		chatID := userID // For receiver, the chatId is the sender's ID
+		if message.SenderID == userID {
+			chatID = req.ReceiverID
+		}
+
+		wsMessage := ws.WSMessage{
+			Type: ws.EventMessageReceived,
+			Payload: ws.MessagePayload{
+				ID:         message.ID,
+				ChatID:     chatID,
+				SenderID:   message.SenderID,
+				ReceiverID: *message.ReceiverID,
+				Content:    message.Content,
+				Type:       message.Type,
+				Status:     message.Status,
+				CreatedAt:  message.CreatedAt,
+			},
+			Timestamp: time.Now(),
+		}
+		WSHub.BroadcastToUser(req.ReceiverID, wsMessage)
+
+		// Update status to delivered if receiver is online
+		if WSHub.IsUserOnline(req.ReceiverID) {
+			_, err := database.Pool.Exec(context.Background(),
+				"UPDATE messages SET status = 'delivered', updated_at = $1 WHERE id = $2",
+				time.Now(), message.ID)
+			if err != nil {
+				log.Printf("Failed to update message status to delivered: %v", err)
+			} else {
+				message.Status = "delivered"
+
+				// Broadcast delivery status to sender
+				deliveryMessage := ws.WSMessage{
+					Type: ws.EventMessageDelivered,
+					Payload: ws.MessageStatusPayload{
+						MessageID: message.ID,
+						Status:    "delivered",
+						UpdatedAt: time.Now(),
+					},
+					Timestamp: time.Now(),
+				}
+				WSHub.BroadcastToUser(userID, deliveryMessage)
+			}
+		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -244,6 +294,50 @@ func MarkAsRead(c *fiber.Ctx) error {
 	rowsAffected := int64(0)
 	if cmdTag, ok := result.(interface{ RowsAffected() int64 }); ok {
 		rowsAffected = cmdTag.RowsAffected()
+	}
+
+	// Broadcast read status via WebSocket
+	if WSHub != nil && rowsAffected > 0 {
+		// Get the sender ID to notify
+		var senderID string
+		if len(req.MessageIDs) > 0 {
+			// Get sender from first message
+			err := database.Pool.QueryRow(context.Background(),
+				"SELECT sender_id FROM messages WHERE id = $1", req.MessageIDs[0]).Scan(&senderID)
+			if err == nil {
+				for _, msgID := range req.MessageIDs {
+					readMessage := ws.WSMessage{
+						Type: ws.EventMessageRead,
+						Payload: ws.MessageStatusPayload{
+							MessageID: msgID,
+							Status:    "read",
+							UpdatedAt: time.Now(),
+						},
+						Timestamp: time.Now(),
+					}
+					WSHub.BroadcastToUser(senderID, readMessage)
+				}
+			}
+		} else if req.SenderID != "" {
+			senderID = req.SenderID
+		} else if req.ChatID != "" {
+			senderID = req.ChatID
+		}
+
+		// Notify sender that all their messages were read
+		if senderID != "" {
+			readMessage := ws.WSMessage{
+				Type: ws.EventMessageRead,
+				Payload: fiber.Map{
+					"chatId":       userID,
+					"readBy":       userID,
+					"updatedCount": rowsAffected,
+					"updatedAt":    time.Now(),
+				},
+				Timestamp: time.Now(),
+			}
+			WSHub.BroadcastToUser(senderID, readMessage)
+		}
 	}
 
 	return c.JSON(fiber.Map{

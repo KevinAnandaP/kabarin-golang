@@ -4,8 +4,14 @@ import (
 	"ngabarin/server/internal/handlers"
 	"ngabarin/server/internal/middleware"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
+
+// InitWebSocket initializes the WebSocket hub
+func InitWebSocket() {
+	handlers.InitWebSocket()
+}
 
 // SetupRoutes configures all application routes
 func SetupRoutes(app *fiber.App) {
@@ -53,4 +59,10 @@ func SetupRoutes(app *fiber.App) {
 	groups.Post("/:groupId/members", handlers.AddGroupMembers)
 	groups.Delete("/:groupId/members/:userId", handlers.RemoveGroupMember)
 	groups.Post("/:groupId/leave", handlers.LeaveGroup)
+
+	// WebSocket route (protected)
+	api.Get("/ws", middleware.AuthMiddleware, handlers.WebSocketUpgrade, websocket.New(handlers.WebSocketHandler))
+
+	// WebSocket stats (protected, for debugging)
+	api.Get("/ws/stats", middleware.AuthMiddleware, handlers.GetWebSocketStats)
 }
