@@ -188,7 +188,7 @@ func GetMessages(c *fiber.Ctx) error {
 		FROM messages m
 		INNER JOIN users u ON m.sender_id = u.id
 		WHERE (m.sender_id = $1 AND m.receiver_id = $2) OR (m.sender_id = $2 AND m.receiver_id = $1)
-		ORDER BY m.created_at DESC
+		ORDER BY m.created_at ASC
 		LIMIT $3 OFFSET $4
 	`, userID, chatID, limit, offset)
 
