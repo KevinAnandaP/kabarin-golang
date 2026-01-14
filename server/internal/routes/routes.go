@@ -44,6 +44,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Message routes (protected)
 	messages := api.Group("/messages", middleware.AuthMiddleware)
+	messages.Get("/chats", handlers.GetChats) // Get all chats (contacts + non-contacts with messages)
 	messages.Post("/", handlers.SendMessage)
 	messages.Get("/:chatId", handlers.GetMessages)
 	messages.Put("/read", handlers.MarkAsRead)
