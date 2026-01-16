@@ -1,6 +1,8 @@
+// woi ini ga disentuh sama sekali, kenapa tiba2 kolom buat ngirim pesannya ilang
+
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -55,17 +57,7 @@ export default function ChatArea({ contact, currentUserId, onContactAdded }: Cha
   const [addingContact, setAddingContact] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (contact) {
-      fetchMessages()
-    }
-  }, [contact])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!contact) return
 
     setLoading(true)
@@ -97,7 +89,18 @@ export default function ChatArea({ contact, currentUserId, onContactAdded }: Cha
     } finally {
       setLoading(false)
     }
-  }
+  }, [contact])
+
+  useEffect(() => {
+    if (contact) {
+      fetchMessages()
+    }
+  }, [contact, fetchMessages])
+
+  useEffect(() => {
+    // Disabled auto-scroll temporarily to debug layout issue
+    // scrollToBottom()
+  }, [messages])
 
   const sendMessage = async () => {
     if (!message.trim() || !contact || sending) return
