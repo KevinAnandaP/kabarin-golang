@@ -1,3 +1,3 @@
-# Ngabarin - Web Chat Application
+# Ngabarin
 
 Real-time web chat application
